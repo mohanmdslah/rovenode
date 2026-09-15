@@ -1,0 +1,8 @@
+{
+  "chainId": 56,
+  "explorer": "https://bscscan.com",
+  "token": "0x1b9ebc101eab01f9b92ad30f9fc0ab6d7b3a8888",
+  "hub": "0x1395df45f8afafb43e755d6fcccec52201d28888",
+  "deposit": "0x272cC8f492b89cf69934E50B1Ba0878f4Fc7339F",
+  "usdt": "0x55d398326f99059fF775485246999027B3197955"
+}
