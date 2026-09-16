@@ -781,36 +781,81 @@ a { color: inherit; }
 .referral-connect { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:20px; padding:26px 30px; border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
 .referral-connect p { margin:0; display:flex; align-items:center; gap:10px; color:#c9c5ba; font-size:14px; }
 .referral-connect p svg { color:var(--gold); flex-shrink:0; }
-.referral-grid { display:grid; gap:18px; }
+.referral-console { display:grid; gap:18px; }
+
+/* Summary strip: one identity cell plus the network figures, spread across the
+   full shell width so the section never reads as a narrow left-hand column. */
+.referral-metrics { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3, minmax(0,.78fr)); border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
+.referral-metric { display:grid; align-content:start; gap:9px; min-height:126px; padding:20px 22px; border-left:1px solid var(--line); }
+.referral-metric:first-child { border-left:0; }
+.referral-metric-label { color:#8f918f; font:500 10px/1.4 "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.07em; }
+.referral-metric-value { display:flex; flex-wrap:wrap; align-items:center; gap:10px; min-height:30px; }
+.referral-metric-note { color:#6f716d; font:500 10px/1.5 "IBM Plex Mono",monospace; }
+.referral-figure { color:#f2ecdd; font:600 30px/1 "IBM Plex Mono",monospace; letter-spacing:-.01em; }
+.referral-none { color:#8b8d89; font-size:13px; font-weight:500; }
+
 .referral-card { border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
 .referral-card-head { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:58px; padding:0 22px; border-bottom:1px solid var(--line); }
 .referral-card-head h3 { display:flex; align-items:center; gap:10px; margin:0; color:#e8e3d6; font-size:15px; font-weight:600; }
 .referral-card-head h3 svg { color:var(--gold); flex-shrink:0; }
-.referral-hint { color:#7e807c; font:500 10px "IBM Plex Mono",monospace; }
 .referral-head-actions { display:flex; align-items:center; gap:14px; }
 .referral-total { display:inline-flex; align-items:baseline; gap:8px; color:#8f918f; font:500 10px "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.06em; }
 .referral-total strong { color:var(--gold-pale); font:600 18px "IBM Plex Mono",monospace; }
-.referral-empty { margin:0; padding:26px 22px; color:#77756f; font:500 11px/1.7 "IBM Plex Mono",monospace; }
+.referral-empty { margin:0; padding:26px 22px; border-bottom:1px solid var(--line); color:#77756f; font:500 11px/1.7 "IBM Plex Mono",monospace; }
 .referral-empty.is-error { color:#e7a99e; }
-.referral-upline-row { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:22px; }
-.referral-address { display:inline-flex; align-items:center; gap:8px; color:var(--gold-pale); font:500 13px "IBM Plex Mono",monospace; text-decoration:none; overflow-wrap:anywhere; }
+.referral-address { display:inline-flex; align-items:center; gap:8px; color:var(--gold-pale); font:500 12px/1.5 "IBM Plex Mono",monospace; text-decoration:none; overflow-wrap:anywhere; }
 .referral-address:hover { text-decoration:underline; }
 .referral-address svg { flex-shrink:0; opacity:.75; }
-.referral-level { flex-shrink:0; padding:4px 10px; border:1px solid rgba(232,185,73,.42); color:var(--gold-pale); font:600 10px "IBM Plex Mono",monospace; letter-spacing:.08em; }
+.referral-level { flex-shrink:0; padding:4px 10px; border:1px solid rgba(232,185,73,.42); color:var(--gold-pale); font:600 10px "IBM Plex Mono",monospace; letter-spacing:.08em; white-space:nowrap; }
 .referral-level.is-empty { border-color:rgba(255,255,255,.16); color:#8f918f; letter-spacing:.02em; }
-.referral-pager { display:flex; align-items:center; justify-content:center; gap:16px; padding:16px 22px 4px; }
-.referral-pager span { color:#a7a297; font:500 10px "IBM Plex Mono",monospace; }
-.referral-pager button { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; color:#d8d3c6; background:#121519; border:1px solid #2a2d32; cursor:pointer; transition:border-color .2s ease,color .2s ease; }
-.referral-pager button:not(:disabled):hover { border-color:var(--gold); color:var(--gold-pale); }
-.referral-pager button:disabled { opacity:.4; cursor:not-allowed; }
-.referral-range { margin:0; padding:0 22px 20px; text-align:center; color:#6f716d; font:500 10px "IBM Plex Mono",monospace; }
+
+/* Records wrap into two balanced columns so short rows fill the panel instead
+   of leaving the identity badge stranded beside a mostly empty row. */
+.referral-list-wrap { max-width:100%; }
+.referral-list-head, .referral-record { display:grid; grid-template-columns:52px minmax(0,1fr) 108px; align-items:center; gap:14px; }
+.referral-list-head { padding:12px 22px; background:#101317; border-bottom:1px solid var(--line); color:#aaa79e; font:500 11px "IBM Plex Mono",monospace; }
+.referral-list { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); }
+/* Every record carries its own bottom rule, so the divider above the footer is
+   correct for both odd and even record counts; only the last odd record would
+   otherwise draw a gutter beside an empty cell. */
+.referral-record { padding:15px 22px; border-bottom:1px solid var(--line); }
+.referral-record:nth-child(odd) { border-right:1px solid var(--line); }
+.referral-record:last-child:nth-child(odd) { border-right:0; }
+.referral-record:hover { background:rgba(255,255,255,.02); }
+.referral-record-index { color:#6f716d; font:500 11px "IBM Plex Mono",monospace; }
+/* The full address fills wide cells and is ellipsised in narrow ones, so the
+   row never wraps to two lines at any width. */
+.referral-record .referral-address > span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.referral-record .referral-address { min-width:0; }
+.referral-record .referral-level { justify-self:end; }
+
+/* The list (or the empty state) already draws the rule above the footer. */
+.referral-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:14px; padding:16px 22px 20px; }
 .referral-source { display:flex; align-items:center; gap:9px; margin:0; color:#7e807c; font:500 10px "IBM Plex Mono",monospace; }
 .referral-source svg { color:#6d706e; flex-shrink:0; }
 .referral-source a { display:inline-flex; align-items:center; gap:7px; color:#a9a59a; text-decoration:none; }
 .referral-source a:hover { color:var(--gold-pale); }
+.referral-pager { display:flex; align-items:center; gap:16px; }
+.referral-pager span { color:#a7a297; font:500 10px "IBM Plex Mono",monospace; }
+.referral-pager button { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; color:#d8d3c6; background:#121519; border:1px solid #2a2d32; cursor:pointer; transition:border-color .2s ease,color .2s ease; }
+.referral-pager button:not(:disabled):hover { border-color:var(--gold); color:var(--gold-pale); }
+.referral-pager button:disabled { opacity:.4; cursor:not-allowed; }
 
+@media (max-width:1100px) {
+  .referral-metrics { grid-template-columns:minmax(0,1.3fr) repeat(3, minmax(0,.8fr)); }
+  .referral-metric { padding:18px 16px; }
+}
+@media (max-width:819px) {
+  .referral-list { grid-template-columns:minmax(0,1fr); }
+  .referral-list-head { display:none; }
+  .referral-record:nth-child(odd) { border-right:0; }
+}
 @media (max-width:900px) {
   .referral-section::before { display:none; }
+  .referral-metrics { grid-template-columns:repeat(2, minmax(0,1fr)); }
+  .referral-metric { min-height:110px; }
+  .referral-metric:nth-child(3) { border-left:0; }
+  .referral-metric:nth-child(n+3) { border-top:1px solid var(--line); }
 }
 @media (max-width:560px) {
   .node-bind-step { margin:0 16px 14px; padding:14px; }
@@ -819,9 +864,17 @@ a { color: inherit; }
   .node-bind-submit { width:100%; }
   .referral-connect { padding:20px 16px; align-items:stretch; }
   .referral-connect .primary-button { width:100%; }
-  .referral-card-head { min-height:52px; padding:0 16px; flex-wrap:wrap; }
+  .referral-metrics { grid-template-columns:minmax(0,1fr); }
+  .referral-metric { min-height:0; padding:16px; border-left:0; border-top:1px solid var(--line); }
+  .referral-metric:first-child { border-top:0; }
+  .referral-figure { font-size:24px; }
+  .referral-card-head { min-height:52px; padding:0 16px; }
+  .referral-total { display:none; }
   .referral-empty { padding:20px 16px; }
-  .referral-upline-row { padding:16px; }
-  .referral-address { font-size:12px; }
-  .referral-range { padding-inline:16px; }
+  .referral-address { font-size:11px; }
+  .referral-foot { padding:14px 16px 18px; justify-content:center; }
+  .referral-pager { width:100%; justify-content:space-between; }
+  .referral-list-head { display:none; }
+  .referral-list { grid-template-columns:minmax(0,1fr); }
+  .referral-record { grid-template-columns:34px minmax(0,1fr) auto; padding:14px 16px; }
 }

@@ -216,12 +216,12 @@ async function main() {
   record("the locked label tells the user to bind first", String(purchaseButton?.textContent ?? "").includes("绑定上级"), purchaseButton?.textContent?.trim());
 
   // ── referral console ───────────────────────────────────────────────────
-  const uplineCard = document.querySelector(".referral-upline");
+  const uplineCard = document.querySelector(".referral-metric-upline");
   record("the console renders the upline card", Boolean(uplineCard));
   record("no upline is shown before binding", /尚未绑定上级/.test(uplineCard?.textContent ?? ""), uplineCard?.textContent?.trim().slice(0, 60));
 
   const downline = document.querySelector(".referral-downline");
-  const rowCount = () => downline?.querySelectorAll("tbody tr").length ?? 0;
+  const rowCount = () => downline?.querySelectorAll(".referral-record").length ?? 0;
   await waitFor(() => /入网后/.test(downline?.textContent ?? ""));
   record("an unregistered wallet is told to bind before downlines appear", /入网后/.test(downline?.textContent ?? ""), downline?.textContent?.trim().replace(/\s+/g, " ").slice(0, 70));
   record("an unregistered wallet has no rows", rowCount() === 0, `rows=${rowCount()}`);
@@ -246,7 +246,7 @@ async function main() {
   record("the purchase button unlocks after binding", document.querySelector(".node-action-row .primary-button")?.disabled === false, `disabled=${document.querySelector(".node-action-row .primary-button")?.disabled}`);
 
   const uplineAfter = await waitFor(() => {
-    const text = document.querySelector(".referral-upline")?.textContent ?? "";
+    const text = document.querySelector(".referral-metric-upline")?.textContent ?? "";
     return /0x2467/.test(text) ? text : null;
   }, 10000);
   record("the console refreshes to show the new upline", Boolean(uplineAfter), (uplineAfter ?? "").trim().replace(/\s+/g, " ").slice(0, 80));
@@ -255,9 +255,9 @@ async function main() {
     document.documentElement.scrollWidth <= window.innerWidth + 1,
     `scrollWidth=${document.documentElement.scrollWidth} innerWidth=${window.innerWidth}`);
   if (window.innerWidth <= 560) {
-    const rows = [...document.querySelectorAll(".referral-downline tbody tr")];
-    const labelled = rows.length > 0 && rows.every((row) => [...row.querySelectorAll("td")].every((cell) => cell.dataset.label));
-    record("phone rows fall back to labelled cells", labelled, `rows=${rows.length} labelled=${labelled}`);
+    const list = document.querySelector(".referral-list");
+    const columns = list ? getComputedStyle(list).gridTemplateColumns.split(" ").length : 0;
+    record("the record list is a single column on a phone", columns === 1, `columns=${columns}`);
   }
 
   // ── console pagination now that the wallet is registered ───────────────
@@ -265,7 +265,7 @@ async function main() {
   record("the downline total comes from the contract", /23/.test(downline?.textContent ?? ""), `rows on page 1: ${rowCount()}`);
   record("page one shows ten rows", rowCount() === 10, `rows=${rowCount()}`);
   record("the pager reports three pages", /1 \/ 3/.test(downline?.textContent ?? ""), downline?.querySelector(".referral-pager")?.textContent?.trim());
-  const levelTags = [...(downline?.querySelectorAll("tbody .referral-level") ?? [])].map((node) => node.textContent.trim());
+  const levelTags = [...(downline?.querySelectorAll(".referral-record .referral-level") ?? [])].map((node) => node.textContent.trim());
   record("each downline carries a node identity", levelTags.length === 10 && levelTags.some((tag) => /^L[1-3]$/.test(tag)) && levelTags.some((tag) => tag === "未成为节点"), levelTags.join(", "));
 
   downline.querySelectorAll(".referral-pager button")[1].click();

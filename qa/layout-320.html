@@ -34,7 +34,7 @@
         record("the viewport really is 320px wide", inner.innerWidth === 320, `innerWidth=${inner.innerWidth}`);
         const failedInner = innerResults.filter((item) => !item.ok);
         record("every inner check passed at 320px", failedInner.length === 0, failedInner.map((item) => item.name).join("; "));
-        for (const name of ["phone rows fall back to labelled cells", "the bind row stacks on a phone"]) {
+        for (const name of ["the record list is a single column on a phone", "the bind row stacks on a phone"]) {
           const found = innerResults.find((item) => item.name === name);
           record(`320px · ${name}`, found?.ok === true, found ? found.detail : "not reported");
         }

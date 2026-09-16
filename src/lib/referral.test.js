@@ -141,6 +141,30 @@ test("a downline page pairs each address with its node identity", async () => {
   ]);
 });
 
+test("the overview carries the wallet's own level and the network size", async () => {
+  const reader = createReferralReader({
+    createSale: () => fakeSale({
+      getNodeLevel: async () => 3,
+      registeredCount: async () => 43,
+      getUpline: async () => ({ upline: ROOT, uplineLevel: 0 }),
+      getDirectDownlineCount: async () => 0,
+    }),
+  });
+  const overview = await reader.readOverview({ provider: PROVIDER, account: WALLET });
+  assert.equal(overview.ownLevel, 3);
+  assert.equal(overview.networkSize, 42, "the root vertex is excluded from the network total");
+  assert.equal(overview.registered, true);
+  assert.deepEqual(overview.upline, { address: ROOT, level: 0, isRoot: true });
+});
+
+test("an empty network never reports a negative size", async () => {
+  const reader = createReferralReader({ createSale: () => fakeSale({ registeredCount: async () => 1 }) });
+  assert.equal(await reader.readNetworkSize({ provider: PROVIDER }), 0);
+  const empty = createReferralReader({ createSale: () => fakeSale({ registeredCount: async () => 0 }) });
+  assert.equal(await empty.readNetworkSize({ provider: PROVIDER }), 0);
+  await assert.rejects(() => reader.readNetworkSize({ provider: null }), { code: "PROVIDER_NOT_FOUND" });
+});
+
 test("an empty downline set never hits the paged getter", async () => {
   let called = false;
   const reader = createReferralReader({
@@ -248,6 +272,7 @@ test("the referral ABI matches the deployed contract surface", () => {
     "root()", "isRegistered(address)", "registeredCount()", "getUpline(address)",
     "getDirectDownlineCount(address)", "getDirectDownlines(address,uint256,uint256)",
     "getRegisteredPage(uint256,uint256)", "getUplineChain(address,uint256)", "bindUpline(address)",
+    "getNodeLevel(address)",
   ]) {
     assert.ok(contract.interface.getFunction(signature), `${signature} is missing from the ABI`);
   }

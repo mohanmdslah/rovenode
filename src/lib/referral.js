@@ -17,6 +17,7 @@ export const REFERRAL_ABI = [
   "function isRegistered(address account) view returns (bool)",
   "function registeredCount() view returns (uint256)",
   "function getUpline(address account) view returns (address upline, uint8 uplineLevel)",
+  "function getNodeLevel(address account) view returns (uint8)",
   "function getDirectDownlineCount(address account) view returns (uint256)",
   "function getDirectDownlines(address account, uint256 offset, uint256 limit) view returns (address[] accounts, uint8[] levels)",
   "function getRegisteredPage(uint256 offset, uint256 limit) view returns (address[] accounts, address[] uplines, uint8[] levels)",
@@ -189,17 +190,36 @@ export function createReferralReader({ createSale = defaultCreateSale } = {}) {
     return { count, rows, ...info };
   }
 
-  /** Everything the referral console shows for one wallet. */
-  async function readOverview({ provider, account, page = 1, pageSize = REFERRAL_PAGE_SIZE }) {
-    const [registered, upline] = await Promise.all([
-      isRegistered({ provider, account }),
-      readUpline({ provider, account }),
-    ]);
-    const downlines = await readDirectDownlines({ provider, account, page, pageSize });
-    return { registered, upline, ...downlines };
+  /** The connected wallet's own node identity (0 = not a node yet). */
+  async function readOwnLevel({ provider, account }) {
+    assertWallet({ provider, account });
+    return Number(await createSale(provider).getNodeLevel(account));
   }
 
-  return { isRegistered, readUpline, readDirectDownlines, readOverview };
+  /**
+   * Total registered addresses. The chain has no team totals because the tree
+   * is unbounded, so this is the only exact network-wide number available; the
+   * root vertex is excluded.
+   */
+  async function readNetworkSize({ provider }) {
+    if (!provider?.request) throw referralError("PROVIDER_NOT_FOUND", "No EIP-1193 wallet provider found");
+    const total = Number(await createSale(provider).registeredCount());
+    return total > 0 ? total - 1 : 0;
+  }
+
+  /** Everything the referral console shows for one wallet. */
+  async function readOverview({ provider, account, page = 1, pageSize = REFERRAL_PAGE_SIZE }) {
+    const [registered, upline, ownLevel, networkSize] = await Promise.all([
+      isRegistered({ provider, account }),
+      readUpline({ provider, account }),
+      readOwnLevel({ provider, account }),
+      readNetworkSize({ provider }),
+    ]);
+    const downlines = await readDirectDownlines({ provider, account, page, pageSize });
+    return { registered, upline, ownLevel, networkSize, ...downlines };
+  }
+
+  return { isRegistered, readUpline, readOwnLevel, readNetworkSize, readDirectDownlines, readOverview };
 }
 
 export const referralReader = createReferralReader();
