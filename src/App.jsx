@@ -6,6 +6,7 @@ import { EconomySections } from "./components/EconomySections.jsx";
 import { TransparencyDashboard } from "./components/TransparencyDashboard.jsx";
 import { GenesisProgram } from "./components/GenesisProgram.jsx";
 import { NodeProgram } from "./components/NodeProgram.jsx";
+import { ReferralConsole } from "./components/ReferralConsole.jsx";
 import { RoadmapFooter } from "./components/RoadmapFooter.jsx";
 import { LocaleMenu } from "./components/LocaleMenu.jsx";
 import { PageLoader } from "./components/PageLoader.jsx";
@@ -14,7 +15,7 @@ import { getHeroParallax } from "./lib/hero-motion.js";
 import { discoverInjectedWallet, formatWalletAddress, watchInjectedWallet } from "./lib/wallet.js";
 import { createWalletSession } from "./lib/wallet-session.js";
 
-const anchors = ["story", "engine", "dashboard", "genesis", "node", "roadmap"];
+const anchors = ["story", "engine", "dashboard", "genesis", "node", "network", "roadmap"];
 
 function scrollTo(id) {
   const target = document.getElementById(id);
@@ -169,6 +170,8 @@ export function App() {
   const walletSession = useRef(null);
   const [walletProvider, setWalletProvider] = useState(null);
   const [walletIssue, setWalletIssue] = useState("");
+  // Bumped when a binding lands so the referral console re-reads the chain.
+  const [referralVersion, setReferralVersion] = useState(0);
   const walletAddress = session.account;
   const walletBusy = session.busy;
   const issueKey = walletIssue || session.error;
@@ -269,6 +272,14 @@ export function App() {
             walletBusy={walletBusy}
             onConnect={connectWallet}
             provider={walletProvider}
+            onReferralChange={() => setReferralVersion((version) => version + 1)}
+          />
+          <ReferralConsole
+            walletAddress={walletAddress}
+            walletBusy={walletBusy}
+            onConnect={connectWallet}
+            provider={walletProvider}
+            refreshKey={referralVersion}
           />
           <SpaceStory />
           <EconomySections />

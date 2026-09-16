@@ -751,3 +751,77 @@ a { color: inherit; }
 .node-offer-facts strong::before { position:relative; z-index:6; }
 @media (max-width:560px) { .node-offer-facts::before { left: 5%; right: 5%; } }
 .node-offer .primary-button:disabled { opacity:.48; filter:grayscale(.35); cursor:not-allowed; box-shadow:none; }
+
+/* ── Referral binding gate inside the node purchase panel ───────────────── */
+.node-bind-step { margin:0 24px 18px; padding:16px 18px; border:1px solid #3b3320; background:linear-gradient(145deg,rgba(232,185,73,.07),rgba(232,185,73,.02)); }
+.node-bind-step.is-bound { border-color:#2b3a2f; background:linear-gradient(145deg,rgba(100,200,122,.07),rgba(100,200,122,.02)); }
+.node-bind-head { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.node-bind-head strong { display:flex; align-items:center; gap:8px; color:#f0ead9; font:600 12px "IBM Plex Mono",monospace; letter-spacing:.04em; }
+.node-bind-head strong svg { color:var(--gold); flex-shrink:0; }
+.node-bind-state { display:inline-flex; align-items:center; gap:6px; color:#8ccbad; font:600 10px "IBM Plex Mono",monospace; white-space:nowrap; }
+.node-bind-body { margin:10px 0 0; color:#9b9a93; font-size:11px; line-height:1.7; }
+.node-bind-row { margin-top:14px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:center; }
+.node-bind-row input { min-width:0; min-height:48px; padding:0 14px; color:#eee8da; background:#0c0f13; border:1px solid #2a2d32; font:500 12px "IBM Plex Mono",monospace; }
+.node-bind-row input::placeholder { color:#64665f; }
+.node-bind-row input:focus-visible { outline:none; border-color:var(--gold); box-shadow:0 0 0 1px rgba(232,185,73,.35); }
+.node-bind-row input:disabled { opacity:.6; }
+.node-bind-root { white-space:nowrap; font-size:11px; }
+.node-bind-submit { min-height:48px; }
+.node-bind-note { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:6px 16px; color:#7e807c; font:500 10px/1.6 "IBM Plex Mono",monospace; }
+.node-bind-root-label { color:#a99257; }
+.node-bind-status { margin-top:12px; padding-top:12px; border-top:1px solid rgba(255,255,255,.07); }
+.node-bind-status p { margin:0; color:#c8c3b5; font-size:11px; line-height:1.6; }
+.node-bind-status.is-error p { color:#e7a99e; }
+.node-bind-status.is-success p { color:#8ccbad; }
+.node-bind-status .node-transaction-link { margin-top:8px; }
+
+/* ── Referral console ───────────────────────────────────────────────────── */
+.referral-section { position:relative; scroll-margin-top:76px; overflow:hidden; border-bottom:1px solid var(--line); background:#080a0d; }
+.referral-section::before { content:"UPLINE / DOWNLINE / NODE LEVEL"; position:absolute; top:34px; right:92px; color:rgba(232,185,73,.1); font:600 11px "IBM Plex Mono",monospace; }
+.referral-connect { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:20px; padding:26px 30px; border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
+.referral-connect p { margin:0; display:flex; align-items:center; gap:10px; color:#c9c5ba; font-size:14px; }
+.referral-connect p svg { color:var(--gold); flex-shrink:0; }
+.referral-grid { display:grid; gap:18px; }
+.referral-card { border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
+.referral-card-head { display:flex; align-items:center; justify-content:space-between; gap:16px; min-height:58px; padding:0 22px; border-bottom:1px solid var(--line); }
+.referral-card-head h3 { display:flex; align-items:center; gap:10px; margin:0; color:#e8e3d6; font-size:15px; font-weight:600; }
+.referral-card-head h3 svg { color:var(--gold); flex-shrink:0; }
+.referral-hint { color:#7e807c; font:500 10px "IBM Plex Mono",monospace; }
+.referral-head-actions { display:flex; align-items:center; gap:14px; }
+.referral-total { display:inline-flex; align-items:baseline; gap:8px; color:#8f918f; font:500 10px "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.06em; }
+.referral-total strong { color:var(--gold-pale); font:600 18px "IBM Plex Mono",monospace; }
+.referral-empty { margin:0; padding:26px 22px; color:#77756f; font:500 11px/1.7 "IBM Plex Mono",monospace; }
+.referral-empty.is-error { color:#e7a99e; }
+.referral-upline-row { display:flex; flex-wrap:wrap; align-items:center; gap:14px; padding:22px; }
+.referral-address { display:inline-flex; align-items:center; gap:8px; color:var(--gold-pale); font:500 13px "IBM Plex Mono",monospace; text-decoration:none; overflow-wrap:anywhere; }
+.referral-address:hover { text-decoration:underline; }
+.referral-address svg { flex-shrink:0; opacity:.75; }
+.referral-level { flex-shrink:0; padding:4px 10px; border:1px solid rgba(232,185,73,.42); color:var(--gold-pale); font:600 10px "IBM Plex Mono",monospace; letter-spacing:.08em; }
+.referral-level.is-empty { border-color:rgba(255,255,255,.16); color:#8f918f; letter-spacing:.02em; }
+.referral-pager { display:flex; align-items:center; justify-content:center; gap:16px; padding:16px 22px 4px; }
+.referral-pager span { color:#a7a297; font:500 10px "IBM Plex Mono",monospace; }
+.referral-pager button { display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; color:#d8d3c6; background:#121519; border:1px solid #2a2d32; cursor:pointer; transition:border-color .2s ease,color .2s ease; }
+.referral-pager button:not(:disabled):hover { border-color:var(--gold); color:var(--gold-pale); }
+.referral-pager button:disabled { opacity:.4; cursor:not-allowed; }
+.referral-range { margin:0; padding:0 22px 20px; text-align:center; color:#6f716d; font:500 10px "IBM Plex Mono",monospace; }
+.referral-source { display:flex; align-items:center; gap:9px; margin:0; color:#7e807c; font:500 10px "IBM Plex Mono",monospace; }
+.referral-source svg { color:#6d706e; flex-shrink:0; }
+.referral-source a { display:inline-flex; align-items:center; gap:7px; color:#a9a59a; text-decoration:none; }
+.referral-source a:hover { color:var(--gold-pale); }
+
+@media (max-width:900px) {
+  .referral-section::before { display:none; }
+}
+@media (max-width:560px) {
+  .node-bind-step { margin:0 16px 14px; padding:14px; }
+  .node-bind-row { grid-template-columns:1fr; }
+  .node-bind-root { justify-content:flex-start; padding:0; }
+  .node-bind-submit { width:100%; }
+  .referral-connect { padding:20px 16px; align-items:stretch; }
+  .referral-connect .primary-button { width:100%; }
+  .referral-card-head { min-height:52px; padding:0 16px; flex-wrap:wrap; }
+  .referral-empty { padding:20px 16px; }
+  .referral-upline-row { padding:16px; }
+  .referral-address { font-size:12px; }
+  .referral-range { padding-inline:16px; }
+}

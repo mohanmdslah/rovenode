@@ -9,6 +9,7 @@ export const NODE_PRICE_USDT = parseUnits("150", 18);
 
 const SALE_ABI = [
   "function paused() view returns (bool)",
+  "function isRegistered(address account) view returns (bool)",
   "function getNodeLevel(address account) view returns (uint8)",
   "function getTierConfig(uint8 tier) view returns (uint256 priceUsdt, uint256 priceRaw, uint256 maxSupply, uint256 sold)",
   "function buyNode(uint8 tier)",
@@ -51,6 +52,26 @@ export function createNodePurchaseStatusReader({ ensureChain = ensureBscChain, c
 }
 export const readNodePurchaseStatus = createNodePurchaseStatusReader();
 
+/**
+ * Read the full purchase gate in one pass. Registration comes first because
+ * `bindUpline` is allowed while sales are paused: an unregistered wallet should
+ * still be told it can bind now.
+ */
+export function createNodePurchaseGateReader({ createSale = (provider) => new Contract(NODE_SALE_ADDRESS, SALE_ABI, new BrowserProvider(provider)) } = {}) {
+  return async function readNodePurchaseGate({ provider, account }) {
+    if (!provider?.request) throw purchaseError("PROVIDER_NOT_FOUND", "No EIP-1193 wallet provider found");
+    if (!isWalletAddress(account)) throw purchaseError("INVALID_ACCOUNT", "Invalid wallet account");
+    const sale = createSale(provider);
+    const [registered, paused, level] = await Promise.all([
+      sale.isRegistered(account),
+      sale.paused(),
+      sale.getNodeLevel(account),
+    ]);
+    return { registered: Boolean(registered), paused: Boolean(paused), level: Number(level) };
+  };
+}
+export const readNodePurchaseGate = createNodePurchaseGateReader();
+
 async function createClient(provider) {
   const browserProvider = new BrowserProvider(provider);
   const signer = await browserProvider.getSigner();
@@ -63,6 +84,8 @@ export function createNodePurchase({ ensureChain: chainGuard = ensureBscChain, c
     await chainGuard(provider); onStatus({ phase: "checking" });
     const { account, sale, usdt } = await clientFactory(provider);
     if (!isSameAddress(account, expectedAccount)) throw purchaseError("ACCOUNT_CHANGED", "The active wallet account changed");
+    // Buying requires an upline binding first; the contract enforces this too.
+    if (!(await sale.isRegistered(account))) throw purchaseError("MUST_BIND_UPLINE", "Bind an upline before buying a node");
     if (await sale.paused()) throw purchaseError("PAUSED", "Node purchases are paused");
     if (Number(await sale.getNodeLevel(account)) !== 0) throw purchaseError("ALREADY_NODE", "This address already owns a node");
     const config = await sale.getTierConfig(tier);
@@ -83,10 +106,16 @@ export function describeNodePurchaseError(error) {
   if (error?.code === 4001 || error?.code === "ACTION_REJECTED") return "rejected";
   if (error?.code === "PROVIDER_NOT_FOUND") return "walletMissing";
   if (error?.code === "CHAIN_NOT_CONFIGURED") return "chainNotConfigured";
+  if (error?.code === "MUST_BIND_UPLINE") return "mustBindUpline";
   if (error?.code === "PAUSED") return "disabled";
   if (error?.code === "ALREADY_NODE") return "alreadyPurchased";
   if (error?.code === "SOLD_OUT") return "soldOut";
   if (error?.code === "INSUFFICIENT_USDT") return "insufficientUsdt";
   if (error?.code === "ACCOUNT_CHANGED") return "accountChanged";
+  const name = String(error?.revert?.name ?? error?.errorName ?? "");
+  if (name === "MustBindUpline") return "mustBindUpline";
+  if (name === "AlreadyNode") return "alreadyPurchased";
+  if (name === "EnforcedPause") return "disabled";
+  if (name === "TierSoldOut") return "soldOut";
   return "failed";
 }

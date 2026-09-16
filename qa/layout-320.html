@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head><meta charset="UTF-8" /><title>ROVE referral layout at 320px</title>
+    <style>body{margin:0;background:#111;color:#eee;font:12px monospace}iframe{width:320px;height:900px;border:0;display:block}#qa-result{padding:12px;white-space:pre-wrap}</style>
+  </head>
+  <body>
+    <pre id="qa-result">pending</pre>
+    <iframe id="frame" src="./referral-console.html"></iframe>
+    <script type="module">
+      // Headless Chrome clamps its window to 500px wide, so a real 320px layout
+      // viewport is measured inside an iframe, where media queries use the
+      // iframe width.
+      const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+      const frame = document.getElementById("frame");
+      const results = [];
+      const record = (name, ok, detail) => results.push({ name, ok, detail: detail || "" });
+      try {
+        const start = Date.now();
+        let doc = null;
+        let text = "pending";
+        while (Date.now() - start < 60000) {
+          // The iframe navigates after this script runs, so re-read its document.
+          doc = frame.contentDocument;
+          text = doc?.getElementById("qa-result")?.textContent ?? "pending";
+          if (doc && text !== "pending") break;
+          await wait(200);
+        }
+        if (!doc || text === "pending") throw new Error("the inner fixture never reported a result");
+        const inner = frame.contentWindow;
+        const innerResults = JSON.parse(text).results;
+        record("the inner scenario completed", innerResults.length > 20, `${innerResults.length} checks`);
+        record("no horizontal overflow at 320px", doc.documentElement.scrollWidth <= inner.innerWidth + 1,
+          `scrollWidth=${doc.documentElement.scrollWidth} innerWidth=${inner.innerWidth}`);
+        record("the viewport really is 320px wide", inner.innerWidth === 320, `innerWidth=${inner.innerWidth}`);
+        const failedInner = innerResults.filter((item) => !item.ok);
+        record("every inner check passed at 320px", failedInner.length === 0, failedInner.map((item) => item.name).join("; "));
+        for (const name of ["phone rows fall back to labelled cells", "the bind row stacks on a phone"]) {
+          const found = innerResults.find((item) => item.name === name);
+          record(`320px · ${name}`, found?.ok === true, found ? found.detail : "not reported");
+        }
+      } catch (error) {
+        record("the 320px scenario ran", false, String(error?.stack ?? error));
+      }
+      document.getElementById("qa-result").textContent = JSON.stringify(results, null, 2);
+    </script>
+  </body>
+</html>
