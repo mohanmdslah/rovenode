@@ -45,6 +45,12 @@ async function main() {
   record("the bind button starts disabled until an address is present", submitDisabled === true, `disabled=${submitDisabled}`);
   record("the removed root shortcut is gone", !document.querySelector(".node-bind-root"));
 
+  const bindNote = document.querySelector(".node-bind-note")?.textContent ?? "";
+  record("the bind note no longer invites users to use the root address", !/没有推荐人/.test(bindNote),
+    bindNote.trim().replace(/\s+/g, " ").slice(0, 90));
+  record("the bind note still states the two binding constraints", /必须先完成购买/.test(bindNote) && /两笔独立交易/.test(bindNote),
+    bindNote.trim().replace(/\s+/g, " ").slice(0, 90));
+
   const bindRow = document.querySelector(".node-bind-row");
   const bindColumns = bindRow ? getComputedStyle(bindRow).gridTemplateColumns.split(" ").length : 0;
   if (window.innerWidth <= 560) {
@@ -99,9 +105,12 @@ async function main() {
   record("binding was submitted to the contract", sent.includes("bindUpline"), `sent: ${sent.join(", ") || "none"}`);
   record("the purchase button unlocks after binding", document.querySelector(".node-action-row .primary-button")?.disabled === false);
 
+  // Derive the expected masked prefix from the configured root so this keeps
+  // working when the deployment changes the root address.
+  const rootPrefix = REFERRAL_ROOT_ADDRESS.slice(0, 6);
   const uplineAfter = await waitFor(() => {
     const text = document.querySelector(".referral-metric-upline")?.textContent ?? "";
-    return /0x2467/.test(text) ? text : null;
+    return text.includes(rootPrefix) ? text : null;
   }, 10000);
   record("the console refreshes to show the new upline", Boolean(uplineAfter), (uplineAfter ?? "").trim().replace(/\s+/g, " ").slice(0, 80));
 

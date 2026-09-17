@@ -77,7 +77,7 @@ export function NodeProgram({ walletAddress, walletBusy, onConnect, provider, on
   };
 
   const startPurchase = async () => {
-    if (!connected || walletBusy || purchaseBusy || hasPurchased || !registered) return;
+    if (!connected || walletBusy || purchaseBusy || hasPurchased || !registered || gate.paused) return;
     setPurchaseStatus({ phase: "checking", hash: "", errorKey: "" });
     try {
       await purchaseNode({ provider, expectedAccount: walletAddress, tier: selectedTier, onStatus: (status) => setPurchaseStatus({ ...status, errorKey: "" }) });
@@ -92,9 +92,11 @@ export function NodeProgram({ walletAddress, walletBusy, onConnect, provider, on
       ? `${purchaseCopy.alreadyPurchasedAction ?? errorCopy.alreadyPurchased} · L${gate.level}`
       : !registered
         ? purchaseCopy.bindLocked
-        : purchaseBusy
-          ? (purchaseCopy.phases?.[purchaseStatus.phase] ?? copy.nodeConnectedAction)
-          : copy.nodeConnectedAction;
+        : gate.paused
+          ? errorCopy.disabled
+          : purchaseBusy
+            ? (purchaseCopy.phases?.[purchaseStatus.phase] ?? copy.nodeConnectedAction)
+            : copy.nodeConnectedAction;
   const status = purchaseStatus.errorKey
     ? (errorCopy[purchaseStatus.errorKey] ?? errorCopy.failed)
     : purchaseStatus.phase === "success"
@@ -149,7 +151,7 @@ export function NodeProgram({ walletAddress, walletBusy, onConnect, provider, on
 
         <div className="node-tier-grid">{configs.map((item) => <button key={item.tier} className={selectedTier === item.tier ? "is-selected" : ""} type="button" onClick={() => setSelectedTier(item.tier)}><span>L{item.tier}<em>{selectedTier === item.tier ? "SELECTED" : ""}</em></span><strong>{item.price} USDT</strong><small>{purchaseCopy.remaining} {item.remaining.toString()} · {purchaseCopy.sold} {item.sold.toString()}</small></button>)}</div><div className="node-offer-facts">{(copy.nodeOfferFacts ?? []).map(([title, body], index) => <div key={title}><strong>0{index + 1}</strong><span>{title}</span><small>{body}</small></div>)}</div>
         <div className={`node-transaction-status ${purchaseStatus.errorKey ? "is-error" : ""} ${purchaseStatus.phase === "success" || hasPurchased ? "is-success" : ""}`} aria-live="polite"><p>{status}</p>{purchaseStatus.hash && <a className="node-transaction-link" href={`${BSCSCAN_TX_URL}${purchaseStatus.hash}`} target="_blank" rel="noreferrer">{purchaseCopy.viewTransaction}<Export size={13} /></a>}</div>
-        <div className="node-action-row"><button className="primary-button" type="button" onClick={connected ? startPurchase : onConnect} disabled={walletBusy || purchaseBusy || hasPurchased || (connected && !registered)} aria-busy={purchaseBusy}>{actionLabel}{purchaseBusy ? <SpinnerGap className="node-spinner" size={18} /> : hasPurchased ? <CheckCircle size={18} weight="fill" /> : <ArrowRight size={18} weight="bold" />}</button><span className={connected ? "is-connected" : ""}><Wallet size={15} />{connected ? formatWalletAddress(walletAddress) : "EIP-1193 · BSC MAINNET"}</span></div>
+        <div className="node-action-row"><button className="primary-button" type="button" onClick={connected ? startPurchase : onConnect} disabled={walletBusy || purchaseBusy || hasPurchased || (connected && !registered) || (connected && gate.paused)} aria-busy={purchaseBusy}>{actionLabel}{purchaseBusy ? <SpinnerGap className="node-spinner" size={18} /> : hasPurchased ? <CheckCircle size={18} weight="fill" /> : <ArrowRight size={18} weight="bold" />}</button><span className={connected ? "is-connected" : ""}><Wallet size={15} />{connected ? formatWalletAddress(walletAddress) : "EIP-1193 · BSC MAINNET"}</span></div>
       </div>
     </div>
   </div></section>;

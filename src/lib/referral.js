@@ -28,9 +28,7 @@ export const REFERRAL_ABI = [
   "function usdc() view returns (address)",
   "function usdcReceiver() view returns (address)",
   "function swapRouter() view returns (address)",
-  "function getSwapPath() view returns (address[])",
   "function slippageBps() view returns (uint256)",
-  "function MAX_SLIPPAGE_BPS() view returns (uint256)",
   "function treasury() view returns (address)",
   "event UplineBound(address indexed account, address indexed upline)",
   "event Swapped(address indexed buyer, uint256 usdtIn, uint256 usdcOut, address indexed receiver)",
@@ -208,18 +206,19 @@ export function createReferralReader({ createSale = defaultCreateSale } = {}) {
 
   /**
    * v2 metadata: the deployed implementation version and the USDT->USDC
-   * settlement route. Handy for verifying which contract the page is talking to
+   * settlement configuration. Handy for verifying which contract the page is talking to
    * through the proxy.
    */
   async function readSaleMetadata({ provider }) {
     if (!provider?.request) throw referralError("PROVIDER_NOT_FOUND", "No EIP-1193 wallet provider found");
     const sale = createSale(provider);
-    const [version, usdc, usdcReceiver, swapRouter, swapPath, slippageBps] = await Promise.all([
+    // v2.1.0 dropped getSwapPath()/MAX_SLIPPAGE_BPS(); the router and slippage
+    // are still readable, so those are what the self-check reports.
+    const [version, usdc, usdcReceiver, swapRouter, slippageBps] = await Promise.all([
       sale.version(),
       sale.usdc(),
       sale.usdcReceiver(),
       sale.swapRouter(),
-      sale.getSwapPath(),
       sale.slippageBps(),
     ]);
     return {
@@ -227,7 +226,6 @@ export function createReferralReader({ createSale = defaultCreateSale } = {}) {
       usdc: String(usdc),
       usdcReceiver: String(usdcReceiver),
       swapRouter: String(swapRouter),
-      swapPath: Array.from(swapPath ?? []).map(String),
       slippageBps: Number(slippageBps),
     };
   }

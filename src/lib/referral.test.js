@@ -273,19 +273,18 @@ test("a purchase is blocked until the wallet has bound an upline", async () => {
 test("v2 sale metadata is read through the proxy", async () => {
   const reader = createReferralReader({
     createSale: () => fakeSale({
-      version: async () => "2.0.0",
+      version: async () => "2.1.0",
       usdc: async () => "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
       usdcReceiver: async () => "0x206DB845F3AB4DE1Fc41f456fCC4a21cBa95D168",
       swapRouter: async () => "0x10ED43C718714eb63d5aA57B78B54704E256024E",
-      getSwapPath: async () => ["0x55d398326f99059fF775485246999027B3197955", "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"],
       slippageBps: async () => 100n,
     }),
   });
   const meta = await reader.readSaleMetadata({ provider: PROVIDER });
-  assert.equal(meta.version, "2.0.0");
+  assert.equal(meta.version, "2.1.0");
   assert.equal(meta.usdc, "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
   assert.equal(meta.usdcReceiver, "0x206DB845F3AB4DE1Fc41f456fCC4a21cBa95D168");
-  assert.equal(meta.swapPath.length, 2, "the route is USDT -> USDC");
+  assert.equal(meta.swapRouter, "0x10ED43C718714eb63d5aA57B78B54704E256024E");
   assert.equal(meta.slippageBps, 100);
   await assert.rejects(() => reader.readSaleMetadata({ provider: null }), { code: "PROVIDER_NOT_FOUND" });
 });
@@ -330,7 +329,7 @@ test("the referral ABI matches the deployed contract surface", () => {
     "getDirectDownlineCount(address)", "getDirectDownlines(address,uint256,uint256)",
     "getRegisteredPage(uint256,uint256)", "getUplineChain(address,uint256)", "bindUpline(address)",
     "getNodeLevel(address)", "version()", "usdc()", "usdcReceiver()", "swapRouter()",
-    "getSwapPath()", "slippageBps()", "MAX_SLIPPAGE_BPS()", "treasury()",
+    "slippageBps()", "treasury()",
   ]) {
     assert.ok(contract.interface.getFunction(signature), `${signature} is missing from the ABI`);
   }
