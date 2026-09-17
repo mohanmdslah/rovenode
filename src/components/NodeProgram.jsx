@@ -136,7 +136,6 @@ export function NodeProgram({ walletAddress, walletBusy, onConnect, provider, on
                   aria-label={purchaseCopy.bindPlaceholder}
                   disabled={bindBusy}
                 />
-                <button className="text-button node-bind-root" type="button" onClick={() => setUplineInput(REFERRAL_ROOT_ADDRESS)} disabled={bindBusy}>{purchaseCopy.bindRootButton}</button>
                 <button className="primary-button node-bind-submit" type="button" onClick={startBind} disabled={walletBusy || bindBusy || !uplineInput.trim()} aria-busy={bindBusy}>
                   {bindBusy ? purchaseCopy.phases?.bindPending : purchaseCopy.bindButton}
                   {bindBusy ? <SpinnerGap className="node-spinner" size={18} /> : <ArrowRight size={18} weight="bold" />}

@@ -16,6 +16,16 @@ const SALE_ABI = [...new Set([
   "function getTierConfig(uint8 tier) view returns (uint256 priceUsdt, uint256 priceRaw, uint256 maxSupply, uint256 sold)",
   "function buyNode(uint8 tier)",
 ])];
+const V2 = {
+  version: "2.0.0",
+  usdc: "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+  usdcReceiver: "0x206DB845F3AB4DE1Fc41f456fCC4a21cBa95D168",
+  swapRouter: "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+  swapPath: ["0x55d398326f99059fF775485246999027B3197955", "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"],
+  slippageBps: 100n,
+  maxSlippageBps: 500n,
+};
+
 const USDT_ABI = [
   "function decimals() view returns (uint8)",
   "function balanceOf(address owner) view returns (uint256)",
@@ -36,6 +46,7 @@ export function installMockNodeSale({ bound = false, downlineCount = 23 } = {}) 
 
   const blockNumber = "0x64";
   const state = {
+    accounts: true,
     bound,
     upline: bound ? root : "0x0000000000000000000000000000000000000000",
     nodeLevel: bound ? 2 : 0,
@@ -72,6 +83,14 @@ export function installMockNodeSale({ bound = false, downlineCount = 23 } = {}) 
     switch (name) {
       case "paused": return sale.encodeFunctionResult(name, [false]);
       case "root": return sale.encodeFunctionResult(name, [root]);
+      case "version": return sale.encodeFunctionResult(name, [V2.version]);
+      case "usdc": return sale.encodeFunctionResult(name, [V2.usdc]);
+      case "usdcReceiver": return sale.encodeFunctionResult(name, [V2.usdcReceiver]);
+      case "treasury": return sale.encodeFunctionResult(name, [V2.usdcReceiver]);
+      case "swapRouter": return sale.encodeFunctionResult(name, [V2.swapRouter]);
+      case "getSwapPath": return sale.encodeFunctionResult(name, [V2.swapPath]);
+      case "slippageBps": return sale.encodeFunctionResult(name, [V2.slippageBps]);
+      case "MAX_SLIPPAGE_BPS": return sale.encodeFunctionResult(name, [V2.maxSlippageBps]);
       case "registeredCount": return sale.encodeFunctionResult(name, [BigInt(state.bound ? state.networkSize + 1 : 1)]);
       case "isRegistered": {
         const account = getAddress(args[0]);
@@ -87,7 +106,14 @@ export function installMockNodeSale({ bound = false, downlineCount = 23 } = {}) 
         const slice = state.downlines.slice(offset, offset + limit);
         return sale.encodeFunctionResult(name, [slice.map((row) => row.address), slice.map((row) => row.level)]);
       }
-      case "getNodeLevel": return sale.encodeFunctionResult(name, [state.nodeLevel]);
+      case "getNodeLevel": {
+        // v2 rule: ROOT owns no node; a direct downline's own tier is its level.
+        const account = getAddress(args[0]);
+        const level = account === root ? 0
+          : account === MOCK_ACCOUNT ? state.nodeLevel
+            : (state.downlines.find((row) => row.address === account)?.level ?? 0);
+        return sale.encodeFunctionResult(name, [level]);
+      }
       case "getTierConfig": {
         const tier = Number(args[0]);
         return sale.encodeFunctionResult(name, [BigInt(tier), BigInt(tier) * 10n ** 18n, BigInt([0, 1000, 600, 400][tier]), 0n]);
@@ -112,7 +138,9 @@ export function installMockNodeSale({ bound = false, downlineCount = 23 } = {}) 
     async request({ method, params = [] }) {
       trace.push(method.startsWith("eth_getTransaction") ? `${method}(${String(params[0]).slice(0, 12)})` : method);
       switch (method) {
-        case "eth_accounts":
+        // `accounts` lets a fixture defer the connected state to reproduce
+        // elements that mount after the page-reveal scan has already run.
+        case "eth_accounts": return state.accounts ? [MOCK_ACCOUNT] : [];
         case "eth_requestAccounts": return [MOCK_ACCOUNT];
         case "eth_chainId": return "0x38";
         case "eth_blockNumber": return blockNumber;

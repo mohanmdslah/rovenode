@@ -197,23 +197,46 @@ export function App() {
   useEffect(() => {
     if (!pageReady) return undefined;
     document.documentElement.classList.add("motion-reveals");
-    const elements = [...document.querySelectorAll("[data-reveal]")];
+    const reveal = (element) => element.classList.add("is-visible");
+    const revealWithin = (node) => {
+      if (node.nodeType !== 1) return;
+      if (node.matches?.("[data-reveal]")) reveal(node);
+      node.querySelectorAll?.("[data-reveal]").forEach(reveal);
+    };
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion || !("IntersectionObserver" in window)) {
-      elements.forEach((element) => element.classList.add("is-visible"));
-      return undefined;
+      document.querySelectorAll("[data-reveal]").forEach(reveal);
+      const watch = new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach(revealWithin)));
+      watch.observe(document.body, { childList: true, subtree: true });
+      return () => watch.disconnect();
     }
+    const observed = new Set();
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
         entry.target.classList.add("is-visible");
+        observed.delete(entry.target);
         observer.unobserve(entry.target);
       });
     }, { rootMargin: "0px 0px -8% 0px", threshold: 0.12 });
-    elements.forEach((element) => observer.observe(element));
+    const observe = (element) => {
+      if (observed.has(element) || element.classList.contains("is-visible")) return;
+      observed.add(element);
+      observer.observe(element);
+    };
+    document.querySelectorAll("[data-reveal]").forEach(observe);
+    // A wallet connecting swaps the referral console in after this scan has
+    // already run; without this, the replacement would never be observed and
+    // would stay stuck at opacity 0.
+    const watch = new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {
+      if (node.nodeType !== 1) return;
+      if (node.matches?.("[data-reveal]")) observe(node);
+      node.querySelectorAll?.("[data-reveal]").forEach(observe);
+    })));
+    watch.observe(document.body, { childList: true, subtree: true });
     const hashTarget = document.getElementById(window.location.hash.slice(1));
-    hashTarget?.querySelectorAll("[data-reveal]").forEach((element) => element.classList.add("is-visible"));
-    return () => observer.disconnect();
+    hashTarget?.querySelectorAll("[data-reveal]").forEach(reveal);
+    return () => { observer.disconnect(); watch.disconnect(); };
   }, [pageReady]);
 
   const attachWalletProvider = useCallback((provider) => {

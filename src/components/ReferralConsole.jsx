@@ -10,7 +10,6 @@ const EMPTY = {
   registered: false,
   upline: { address: "", level: 0, isRoot: false },
   ownLevel: 0,
-  networkSize: 0,
   rows: [],
   count: 0,
   page: 1,
@@ -70,7 +69,6 @@ export function ReferralConsole({ walletAddress, walletBusy, onConnect, provider
         registered: overview.registered,
         upline: overview.upline,
         ownLevel: overview.ownLevel,
-        networkSize: overview.networkSize,
         rows: overview.rows,
         count: overview.count,
         page: overview.page,
@@ -105,15 +103,16 @@ export function ReferralConsole({ walletAddress, walletBusy, onConnect, provider
           <p>{c.body}</p>
         </div>
 
+        <div className="referral-body" data-reveal="item">
         {!connected ? (
-          <div className="referral-connect" data-reveal="item">
+          <div className="referral-connect">
             <p><Wallet size={16} weight="fill" aria-hidden="true" />{c.connectPrompt}</p>
             <button className="primary-button" type="button" onClick={onConnect} disabled={walletBusy} aria-busy={walletBusy}>
               {walletBusy ? copy.connecting : copy.connect}
             </button>
           </div>
         ) : (
-          <div className="referral-console" data-reveal="item">
+          <div className="referral-console">
             <div className="referral-metrics">
               <Metric name="upline" label={c.uplineTitle} note={c.boundHint} wide>
                 {upline.address
@@ -121,13 +120,12 @@ export function ReferralConsole({ walletAddress, walletBusy, onConnect, provider
                   : <strong className="referral-none">{loading ? c.loading : c.uplineNone}</strong>}
               </Metric>
               <Metric name="identity" label={c.identityTitle} note={c.identityNote}>
-                {ownLevel ? <strong className="referral-figure">{ownLevel}</strong> : <strong className="referral-none">{c.levelNone}</strong>}
+                {ownLevel
+                  ? <strong className="referral-figure">{ownLevel}</strong>
+                  : <strong className="referral-none">{loading && state.status !== "ready" ? c.loading : c.levelNone}</strong>}
               </Metric>
               <Metric name="downline" label={c.downlineTotal} note={range}>
                 <strong className="referral-figure">{state.count}</strong>
-              </Metric>
-              <Metric name="network" label={c.networkTitle} note={c.networkNote}>
-                <strong className="referral-figure">{state.networkSize}</strong>
               </Metric>
             </div>
 
@@ -142,9 +140,15 @@ export function ReferralConsole({ walletAddress, walletBusy, onConnect, provider
                 </div>
               </div>
 
-              {state.status === "error" && <p className="referral-empty is-error" role="status">{c.error}</p>}
-              {state.status !== "error" && !state.registered && state.count === 0 && <p className="referral-empty">{c.notRegistered}</p>}
-              {state.status !== "error" && state.registered && !loading && state.count === 0 && <p className="referral-empty">{c.empty}</p>}
+              {state.status === "error" && (
+                <div className="referral-empty is-error" role="status">
+                  <p>{c.error}</p>
+                  <button className="text-button" type="button" onClick={() => load(page)}>{c.refresh}</button>
+                </div>
+              )}
+              {state.status !== "error" && loading && state.rows.length === 0 && <p className="referral-empty" role="status">{c.loading}</p>}
+              {state.status !== "error" && !loading && !state.registered && state.count === 0 && <p className="referral-empty">{c.notRegistered}</p>}
+              {state.status !== "error" && !loading && state.registered && state.count === 0 && <p className="referral-empty">{c.empty}</p>}
 
               {state.status !== "error" && state.rows.length > 0 && (
                 <div className="referral-list-wrap" tabIndex={0} role="region" aria-label={c.downlineTitle}>
@@ -184,6 +188,7 @@ export function ReferralConsole({ walletAddress, walletBusy, onConnect, provider
             </article>
           </div>
         )}
+        </div>
       </div>
     </section>
   );

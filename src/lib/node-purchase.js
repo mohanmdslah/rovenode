@@ -23,6 +23,42 @@ const USDT_ABI = [
 ];
 
 function purchaseError(code, message) { const error = new Error(message); error.code = code; return error; }
+
+/** Contract guards the purchase can still revert with, mapped to their copy key. */
+const BUY_REVERT_CODES = {
+  AlreadyNode: "ALREADY_NODE",
+  EnforcedPause: "PAUSED",
+  TierSoldOut: "SOLD_OUT",
+  MustBindUpline: "MUST_BIND_UPLINE",
+  UplineNotNode: "UPLINE_NOT_NODE",
+};
+
+function revertName(error) {
+  return String(error?.revert?.name ?? error?.errorName ?? error?.info?.error?.name ?? "");
+}
+
+/**
+ * v2 settles a purchase by swapping the buyer's USDT into USDC inside the same
+ * transaction and pays the receiver directly. Any swap failure - thin pool, bad
+ * route, slippage - reverts the whole purchase, and the buyer only loses gas.
+ * Report that as "try again shortly" instead of letting it read like a balance,
+ * allowance or user-cancellation problem.
+ */
+function normalizeBuyError(error) {
+  if (error?.code === 4001 || error?.code === "ACTION_REJECTED") return error;
+  const name = revertName(error);
+  if (BUY_REVERT_CODES[name]) return purchaseError(BUY_REVERT_CODES[name], `The purchase reverted with ${name}`);
+  const text = String(error?.shortMessage ?? error?.reason ?? error?.message ?? "");
+  if (/slippage|swap|uniswap|pancake|insufficient output|k$|router/i.test(text)) {
+    return purchaseError("SWAP_UNAVAILABLE", "The USDT to USDC settlement swap failed");
+  }
+  // Every preflight guard already ran, so an unexplained revert at this point is
+  // the settlement swap, not something the buyer can fix.
+  if (error?.code === "CALL_EXCEPTION" || error?.code === "TRANSACTION_FAILED") {
+    return purchaseError("SWAP_UNAVAILABLE", "The purchase transaction reverted");
+  }
+  return error;
+}
 function isSameAddress(left, right) { try { return getAddress(left) === getAddress(right); } catch { return false; } }
 function assertSuccessfulReceipt(receipt) { if (receipt && Number(receipt.status) === 0) throw purchaseError("TRANSACTION_FAILED", "The transaction reverted"); }
 
@@ -96,8 +132,17 @@ export function createNodePurchase({ ensureChain: chainGuard = ensureBscChain, c
     if (balance < priceRaw) throw purchaseError("INSUFFICIENT_USDT", "Insufficient USDT balance");
     let approvalHash = null;
     if (allowance < priceRaw) { onStatus({ phase: "approving" }); const approval = await usdt.approve(NODE_SALE_ADDRESS, priceRaw); approvalHash = approval.hash; onStatus({ phase: "approvalPending", hash: approvalHash }); assertSuccessfulReceipt(await approval.wait()); }
-    onStatus({ phase: "purchasing" }); const buy = await sale.buyNode(tier); onStatus({ phase: "purchasePending", hash: buy.hash }); const receipt = await buy.wait(); assertSuccessfulReceipt(receipt);
-    onStatus({ phase: "success", hash: buy.hash }); return { approvalHash, depositHash: buy.hash, tier };
+    try {
+      onStatus({ phase: "purchasing" });
+      const buy = await sale.buyNode(tier);
+      onStatus({ phase: "purchasePending", hash: buy.hash });
+      const receipt = await buy.wait();
+      assertSuccessfulReceipt(receipt);
+      onStatus({ phase: "success", hash: buy.hash });
+      return { approvalHash, depositHash: buy.hash, tier };
+    } catch (error) {
+      throw normalizeBuyError(error);
+    }
   };
 }
 export const purchaseNode = createNodePurchase();
@@ -107,13 +152,16 @@ export function describeNodePurchaseError(error) {
   if (error?.code === "PROVIDER_NOT_FOUND") return "walletMissing";
   if (error?.code === "CHAIN_NOT_CONFIGURED") return "chainNotConfigured";
   if (error?.code === "MUST_BIND_UPLINE") return "mustBindUpline";
+  if (error?.code === "UPLINE_NOT_NODE") return "uplineNotNode";
+  if (error?.code === "SWAP_UNAVAILABLE") return "swapUnavailable";
   if (error?.code === "PAUSED") return "disabled";
   if (error?.code === "ALREADY_NODE") return "alreadyPurchased";
   if (error?.code === "SOLD_OUT") return "soldOut";
   if (error?.code === "INSUFFICIENT_USDT") return "insufficientUsdt";
   if (error?.code === "ACCOUNT_CHANGED") return "accountChanged";
-  const name = String(error?.revert?.name ?? error?.errorName ?? "");
+  const name = revertName(error);
   if (name === "MustBindUpline") return "mustBindUpline";
+  if (name === "UplineNotNode") return "uplineNotNode";
   if (name === "AlreadyNode") return "alreadyPurchased";
   if (name === "EnforcedPause") return "disabled";
   if (name === "TierSoldOut") return "soldOut";

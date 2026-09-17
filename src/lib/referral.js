@@ -24,7 +24,16 @@ export const REFERRAL_ABI = [
   "function getUplineChain(address account, uint256 maxDepth) view returns (address[] chain)",
   "function bindUpline(address upline)",
   "function paused() view returns (bool)",
+  "function version() view returns (string)",
+  "function usdc() view returns (address)",
+  "function usdcReceiver() view returns (address)",
+  "function swapRouter() view returns (address)",
+  "function getSwapPath() view returns (address[])",
+  "function slippageBps() view returns (uint256)",
+  "function MAX_SLIPPAGE_BPS() view returns (uint256)",
+  "function treasury() view returns (address)",
   "event UplineBound(address indexed account, address indexed upline)",
+  "event Swapped(address indexed buyer, uint256 usdtIn, uint256 usdcOut, address indexed receiver)",
 ];
 
 function referralError(code, message) {
@@ -53,7 +62,7 @@ export function sameWalletAddress(left, right) {
 /**
  * Map a referral revert or wallet outcome to a stable copy key. The contract
  * stays the authority: the custom errors it raises (MustBindUpline,
- * UplineNotRegistered, AlreadyBound, CannotBindSelf) drive the message the user
+ * UplineNotNode, AlreadyBound, CannotBindSelf) drive the message the user
  * sees, so the UI never has to guess why a binding was refused.
  */
 export function describeReferralError(error) {
@@ -62,14 +71,15 @@ export function describeReferralError(error) {
   if (error?.code === "ALREADY_BOUND") return "alreadyBound";
   if (error?.code === "INVALID_UPLINE") return "invalidUpline";
   if (error?.code === "CANNOT_BIND_SELF") return "cannotBindSelf";
-  if (error?.code === "UPLINE_NOT_REGISTERED") return "uplineNotRegistered";
+  if (error?.code === "UPLINE_NOT_NODE") return "uplineNotNode";
   if (error?.code === "PROVIDER_NOT_FOUND") return "walletMissing";
   if (error?.code === "WALLET_TIMEOUT") return "timeout";
   const name = String(error?.revert?.name ?? error?.errorName ?? error?.info?.error?.name ?? "");
   const text = String(error?.shortMessage ?? error?.reason ?? error?.message ?? "");
   const haystack = `${name} ${text}`;
   if (haystack.includes("MustBindUpline")) return "mustBindUpline";
-  if (haystack.includes("UplineNotRegistered")) return "uplineNotRegistered";
+  // v2 renamed this revert: the upline must own a node, not merely have joined.
+  if (haystack.includes("UplineNotNode") || haystack.includes("UplineNotRegistered")) return "uplineNotNode";
   if (haystack.includes("AlreadyBound")) return "alreadyBound";
   if (haystack.includes("CannotBindSelf")) return "cannotBindSelf";
   if (haystack.includes("EnforcedPause")) return "paused";
@@ -93,14 +103,14 @@ export function normalizeWalletAddress(value) {
 
 /**
  * Client-side preflight for an upline address. This only avoids a pointless
- * transaction - `isRegistered` on the contract is the real gate, and ROOT is
- * always registered there.
+ * transaction - the contract is the real gate, and in v2 it requires the upline
+ * to already own a node, with ROOT as the only exception.
  */
-export function validateUplineAddress(input, { account, isUplineRegistered = () => true } = {}) {
+export function validateUplineAddress(input, { account, isUplineNode = () => true } = {}) {
   const value = typeof input === "string" ? input.trim() : "";
   if (!isWalletAddress(value) || isZeroAddress(value)) return "invalidUpline";
   if (account && sameWalletAddress(value, account)) return "cannotBindSelf";
-  if (!isUplineRegistered(value)) return "uplineNotRegistered";
+  if (!isUplineNode(value)) return "uplineNotNode";
   return "";
 }
 
@@ -197,29 +207,43 @@ export function createReferralReader({ createSale = defaultCreateSale } = {}) {
   }
 
   /**
-   * Total registered addresses. The chain has no team totals because the tree
-   * is unbounded, so this is the only exact network-wide number available; the
-   * root vertex is excluded.
+   * v2 metadata: the deployed implementation version and the USDT->USDC
+   * settlement route. Handy for verifying which contract the page is talking to
+   * through the proxy.
    */
-  async function readNetworkSize({ provider }) {
+  async function readSaleMetadata({ provider }) {
     if (!provider?.request) throw referralError("PROVIDER_NOT_FOUND", "No EIP-1193 wallet provider found");
-    const total = Number(await createSale(provider).registeredCount());
-    return total > 0 ? total - 1 : 0;
+    const sale = createSale(provider);
+    const [version, usdc, usdcReceiver, swapRouter, swapPath, slippageBps] = await Promise.all([
+      sale.version(),
+      sale.usdc(),
+      sale.usdcReceiver(),
+      sale.swapRouter(),
+      sale.getSwapPath(),
+      sale.slippageBps(),
+    ]);
+    return {
+      version: String(version),
+      usdc: String(usdc),
+      usdcReceiver: String(usdcReceiver),
+      swapRouter: String(swapRouter),
+      swapPath: Array.from(swapPath ?? []).map(String),
+      slippageBps: Number(slippageBps),
+    };
   }
 
   /** Everything the referral console shows for one wallet. */
   async function readOverview({ provider, account, page = 1, pageSize = REFERRAL_PAGE_SIZE }) {
-    const [registered, upline, ownLevel, networkSize] = await Promise.all([
+    const [registered, upline, ownLevel] = await Promise.all([
       isRegistered({ provider, account }),
       readUpline({ provider, account }),
       readOwnLevel({ provider, account }),
-      readNetworkSize({ provider }),
     ]);
     const downlines = await readDirectDownlines({ provider, account, page, pageSize });
-    return { registered, upline, ownLevel, networkSize, ...downlines };
+    return { registered, upline, ownLevel, ...downlines };
   }
 
-  return { isRegistered, readUpline, readOwnLevel, readNetworkSize, readDirectDownlines, readOverview };
+  return { isRegistered, readUpline, readOwnLevel, readSaleMetadata, readDirectDownlines, readOverview };
 }
 
 export const referralReader = createReferralReader();
@@ -247,7 +271,12 @@ export function createBindUpline({
     if (!sameWalletAddress(active, account)) throw referralError("ACCOUNT_CHANGED", "The active wallet account changed");
 
     if (await sale.isRegistered(active)) throw referralError("ALREADY_BOUND", "This account already bound an upline");
-    if (!(await sale.isRegistered(target))) throw referralError("UPLINE_NOT_REGISTERED", "The upline has not joined the network yet");
+    // v2: the upline must already own a node; ROOT is the single exception. The
+    // contract reports its own root, so the rule is never guessed here.
+    const rootAddress = await sale.root().catch(() => REFERRAL_ROOT_ADDRESS);
+    if (!sameWalletAddress(target, rootAddress) && Number(await sale.getNodeLevel(target)) === 0) {
+      throw referralError("UPLINE_NOT_NODE", "The upline does not own a node yet");
+    }
 
     const tx = await sale.bindUpline(target);
     onStatus({ phase: "bindPending", hash: tx.hash });

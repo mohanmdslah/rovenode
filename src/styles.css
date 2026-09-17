@@ -760,12 +760,11 @@ a { color: inherit; }
 .node-bind-head strong svg { color:var(--gold); flex-shrink:0; }
 .node-bind-state { display:inline-flex; align-items:center; gap:6px; color:#8ccbad; font:600 10px "IBM Plex Mono",monospace; white-space:nowrap; }
 .node-bind-body { margin:10px 0 0; color:#9b9a93; font-size:11px; line-height:1.7; }
-.node-bind-row { margin-top:14px; display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:10px; align-items:center; }
+.node-bind-row { margin-top:14px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; }
 .node-bind-row input { min-width:0; min-height:48px; padding:0 14px; color:#eee8da; background:#0c0f13; border:1px solid #2a2d32; font:500 12px "IBM Plex Mono",monospace; }
 .node-bind-row input::placeholder { color:#64665f; }
 .node-bind-row input:focus-visible { outline:none; border-color:var(--gold); box-shadow:0 0 0 1px rgba(232,185,73,.35); }
 .node-bind-row input:disabled { opacity:.6; }
-.node-bind-root { white-space:nowrap; font-size:11px; }
 .node-bind-submit { min-height:48px; }
 .node-bind-note { margin:12px 0 0; display:flex; flex-wrap:wrap; gap:6px 16px; color:#7e807c; font:500 10px/1.6 "IBM Plex Mono",monospace; }
 .node-bind-root-label { color:#a99257; }
@@ -785,7 +784,7 @@ a { color: inherit; }
 
 /* Summary strip: one identity cell plus the network figures, spread across the
    full shell width so the section never reads as a narrow left-hand column. */
-.referral-metrics { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(3, minmax(0,.78fr)); border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
+.referral-metrics { display:grid; grid-template-columns:minmax(0,1.5fr) repeat(2, minmax(0,.78fr)); border:1px solid var(--line-bright); background:linear-gradient(145deg,#101319,#0b0d11); }
 .referral-metric { display:grid; align-content:start; gap:9px; min-height:126px; padding:20px 22px; border-left:1px solid var(--line); }
 .referral-metric:first-child { border-left:0; }
 .referral-metric-label { color:#8f918f; font:500 10px/1.4 "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.07em; }
@@ -802,6 +801,8 @@ a { color: inherit; }
 .referral-total { display:inline-flex; align-items:baseline; gap:8px; color:#8f918f; font:500 10px "IBM Plex Mono",monospace; text-transform:uppercase; letter-spacing:.06em; }
 .referral-total strong { color:var(--gold-pale); font:600 18px "IBM Plex Mono",monospace; }
 .referral-empty { margin:0; padding:26px 22px; border-bottom:1px solid var(--line); color:#77756f; font:500 11px/1.7 "IBM Plex Mono",monospace; }
+.referral-empty p { margin:0; }
+.referral-empty .text-button { margin-top:8px; padding:6px 0; color:var(--gold-pale); font:600 11px "IBM Plex Mono",monospace; }
 .referral-empty.is-error { color:#e7a99e; }
 .referral-address { display:inline-flex; align-items:center; gap:8px; color:var(--gold-pale); font:500 12px/1.5 "IBM Plex Mono",monospace; text-decoration:none; overflow-wrap:anywhere; }
 .referral-address:hover { text-decoration:underline; }
@@ -842,7 +843,7 @@ a { color: inherit; }
 .referral-pager button:disabled { opacity:.4; cursor:not-allowed; }
 
 @media (max-width:1100px) {
-  .referral-metrics { grid-template-columns:minmax(0,1.3fr) repeat(3, minmax(0,.8fr)); }
+  .referral-metrics { grid-template-columns:minmax(0,1.3fr) repeat(2, minmax(0,.8fr)); }
   .referral-metric { padding:18px 16px; }
 }
 @media (max-width:819px) {
@@ -860,7 +861,6 @@ a { color: inherit; }
 @media (max-width:560px) {
   .node-bind-step { margin:0 16px 14px; padding:14px; }
   .node-bind-row { grid-template-columns:1fr; }
-  .node-bind-root { justify-content:flex-start; padding:0; }
   .node-bind-submit { width:100%; }
   .referral-connect { padding:20px 16px; align-items:stretch; }
   .referral-connect .primary-button { width:100%; }

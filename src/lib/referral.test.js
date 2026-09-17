@@ -82,7 +82,7 @@ test("upline preflight rejects malformed, self and unregistered addresses", () =
   assert.equal(validateUplineAddress("0x1234", { account: WALLET }), "invalidUpline");
   assert.equal(validateUplineAddress(ZERO_ADDRESS, { account: WALLET }), "invalidUpline");
   assert.equal(validateUplineAddress(WALLET, { account: WALLET }), "cannotBindSelf");
-  assert.equal(validateUplineAddress(UPLINE, { account: WALLET, isUplineRegistered: () => false }), "uplineNotRegistered");
+  assert.equal(validateUplineAddress(UPLINE, { account: WALLET, isUplineNode: () => false }), "uplineNotNode");
   assert.equal(validateUplineAddress(UPLINE, { account: WALLET }), "");
   assert.equal(validateUplineAddress(`  ${UPLINE}  `, { account: WALLET }), "", "surrounding whitespace is ignored");
 });
@@ -91,7 +91,9 @@ test("referral errors map to stable copy keys from codes, names and messages", (
   assert.equal(describeReferralError({ code: 4001 }), "rejected");
   assert.equal(describeReferralError({ code: "MUST_BIND_UPLINE" }), "mustBindUpline");
   assert.equal(describeReferralError({ code: "ALREADY_BOUND" }), "alreadyBound");
-  assert.equal(describeReferralError({ revert: { name: "UplineNotRegistered" } }), "uplineNotRegistered");
+  assert.equal(describeReferralError({ revert: { name: "UplineNotNode" } }), "uplineNotNode");
+  // v1 revert name kept as a defensive fallback; in v2 it means the same thing.
+  assert.equal(describeReferralError({ revert: { name: "UplineNotRegistered" } }), "uplineNotNode");
   assert.equal(describeReferralError({ revert: { name: "CannotBindSelf" } }), "cannotBindSelf");
   assert.equal(describeReferralError({ message: "execution reverted: AlreadyBound()" }), "alreadyBound");
   assert.equal(describeReferralError({ message: "execution reverted: MustBindUpline()" }), "mustBindUpline");
@@ -141,28 +143,19 @@ test("a downline page pairs each address with its node identity", async () => {
   ]);
 });
 
-test("the overview carries the wallet's own level and the network size", async () => {
+test("the overview carries the wallet's own node level", async () => {
   const reader = createReferralReader({
     createSale: () => fakeSale({
       getNodeLevel: async () => 3,
-      registeredCount: async () => 43,
       getUpline: async () => ({ upline: ROOT, uplineLevel: 0 }),
       getDirectDownlineCount: async () => 0,
     }),
   });
   const overview = await reader.readOverview({ provider: PROVIDER, account: WALLET });
   assert.equal(overview.ownLevel, 3);
-  assert.equal(overview.networkSize, 42, "the root vertex is excluded from the network total");
   assert.equal(overview.registered, true);
   assert.deepEqual(overview.upline, { address: ROOT, level: 0, isRoot: true });
-});
-
-test("an empty network never reports a negative size", async () => {
-  const reader = createReferralReader({ createSale: () => fakeSale({ registeredCount: async () => 1 }) });
-  assert.equal(await reader.readNetworkSize({ provider: PROVIDER }), 0);
-  const empty = createReferralReader({ createSale: () => fakeSale({ registeredCount: async () => 0 }) });
-  assert.equal(await empty.readNetworkSize({ provider: PROVIDER }), 0);
-  await assert.rejects(() => reader.readNetworkSize({ provider: null }), { code: "PROVIDER_NOT_FOUND" });
+  assert.equal("networkSize" in overview, false, "the network total is no longer part of the console");
 });
 
 test("an empty downline set never hits the paged getter", async () => {
@@ -186,13 +179,16 @@ test("the reader refuses to query without a provider or a usable account", async
   await assert.rejects(() => reader.isRegistered({ provider: PROVIDER, account: "0x1234" }), { code: "INVALID_ACCOUNT" });
 });
 
-function bindFixture({ registered = false, uplineRegistered = true, revert = null, logs = null } = {}) {
+function bindFixture({ registered = false, uplineIsNode = true, revert = null, logs = null } = {}) {
   const iface = new Interface(REFERRAL_ABI);
   const sent = [];
   const signer = { getAddress: async () => WALLET };
   const sale = {
     interface: iface,
-    isRegistered: async (address) => (sameWalletAddress(address, WALLET) ? registered : uplineRegistered),
+    root: async () => ROOT,
+    isRegistered: async (address) => (sameWalletAddress(address, WALLET) ? registered : true),
+    // v2 requires the upline to own a node; ROOT is reported as owning none.
+    getNodeLevel: async (address) => (sameWalletAddress(address, ROOT) || uplineIsNode ? (sameWalletAddress(address, ROOT) ? 0 : 1) : 0),
     bindUpline: async (target) => {
       sent.push(target);
       if (revert) throw revert;
@@ -226,9 +222,10 @@ test("binding is refused before opening a wallet prompt when it cannot succeed",
   await assert.rejects(() => already.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE }), { code: "ALREADY_BOUND" });
   assert.equal(already.sent.length, 0, "no transaction is sent when the wallet is already bound");
 
-  const notJoined = bindFixture({ uplineRegistered: false });
-  await assert.rejects(() => notJoined.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE }), { code: "UPLINE_NOT_REGISTERED" });
-  assert.equal(notJoined.sent.length, 0);
+  // v2: the upline must already own a node, not merely have joined.
+  const notANode = bindFixture({ uplineIsNode: false });
+  await assert.rejects(() => notANode.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE }), { code: "UPLINE_NOT_NODE" });
+  assert.equal(notANode.sent.length, 0);
 
   const self = bindFixture();
   await assert.rejects(() => self.bind({ provider: PROVIDER, account: WALLET, upline: WALLET }), { code: "CANNOT_BIND_SELF" });
@@ -237,6 +234,13 @@ test("binding is refused before opening a wallet prompt when it cannot succeed",
   const malformed = bindFixture();
   await assert.rejects(() => malformed.bind({ provider: PROVIDER, account: WALLET, upline: "0xnope" }), { code: "INVALID_UPLINE" });
   assert.equal(malformed.sent.length, 0);
+});
+
+test("ROOT is the only upline allowed to have never bought a node", async () => {
+  const f = bindFixture({ uplineIsNode: false });
+  const result = await f.bind({ provider: PROVIDER, account: WALLET, upline: ROOT });
+  assert.deepEqual(f.sent, [ROOT]);
+  assert.equal(result.upline, ROOT);
 });
 
 test("a receipt without the matching UplineBound event is not treated as success", async () => {
@@ -266,13 +270,67 @@ test("a purchase is blocked until the wallet has bound an upline", async () => {
   assert.equal(describeNodePurchaseError({ revert: { name: "MustBindUpline" } }), "mustBindUpline");
 });
 
+test("v2 sale metadata is read through the proxy", async () => {
+  const reader = createReferralReader({
+    createSale: () => fakeSale({
+      version: async () => "2.0.0",
+      usdc: async () => "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d",
+      usdcReceiver: async () => "0x206DB845F3AB4DE1Fc41f456fCC4a21cBa95D168",
+      swapRouter: async () => "0x10ED43C718714eb63d5aA57B78B54704E256024E",
+      getSwapPath: async () => ["0x55d398326f99059fF775485246999027B3197955", "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d"],
+      slippageBps: async () => 100n,
+    }),
+  });
+  const meta = await reader.readSaleMetadata({ provider: PROVIDER });
+  assert.equal(meta.version, "2.0.0");
+  assert.equal(meta.usdc, "0x8AC76a51cc950d9822D68b83fE1Ad97B32Cd580d");
+  assert.equal(meta.usdcReceiver, "0x206DB845F3AB4DE1Fc41f456fCC4a21cBa95D168");
+  assert.equal(meta.swapPath.length, 2, "the route is USDT -> USDC");
+  assert.equal(meta.slippageBps, 100);
+  await assert.rejects(() => reader.readSaleMetadata({ provider: null }), { code: "PROVIDER_NOT_FOUND" });
+});
+
+function buyFixture(buyNode) {
+  const sale = {
+    isRegistered: async () => true,
+    paused: async () => false,
+    getNodeLevel: async () => 0,
+    getTierConfig: async () => ({ priceRaw: 10n ** 18n, maxSupply: 10n, sold: 0n }),
+    buyNode,
+  };
+  const usdt = { balanceOf: async () => 10n ** 18n, allowance: async () => 10n ** 18n };
+  return createNodePurchase({ ensureChain: async () => {}, createClient: async () => ({ account: BUYER, sale, usdt }) });
+}
+
+test("a failed USDT to USDC settlement reads as retry-later, never as a balance problem", async () => {
+  const reverted = Object.assign(new Error("execution reverted"), { code: "CALL_EXCEPTION" });
+  const purchase = buyFixture(async () => { throw reverted; });
+  await assert.rejects(() => purchase({ provider: PROVIDER, expectedAccount: BUYER, tier: 1 }), { code: "SWAP_UNAVAILABLE" });
+  assert.equal(describeNodePurchaseError({ code: "SWAP_UNAVAILABLE" }), "swapUnavailable");
+
+  const sentThenReverted = buyFixture(async () => ({ hash: "0xbuy", wait: async () => ({ status: 0 }) }));
+  await assert.rejects(() => sentThenReverted({ provider: PROVIDER, expectedAccount: BUYER, tier: 1 }), { code: "SWAP_UNAVAILABLE" });
+});
+
+test("known contract guards at buy time keep their own message", async () => {
+  for (const [name, code] of [["AlreadyNode", "ALREADY_NODE"], ["TierSoldOut", "SOLD_OUT"], ["EnforcedPause", "PAUSED"]]) {
+    const purchase = buyFixture(async () => { throw Object.assign(new Error("reverted"), { revert: { name } }); });
+    await assert.rejects(() => purchase({ provider: PROVIDER, expectedAccount: BUYER, tier: 1 }), { code });
+  }
+  const cancelled = Object.assign(new Error("User rejected"), { code: 4001 });
+  const purchase = buyFixture(async () => { throw cancelled; });
+  await assert.rejects(() => purchase({ provider: PROVIDER, expectedAccount: BUYER, tier: 1 }), { code: 4001 });
+  assert.equal(describeNodePurchaseError(cancelled), "rejected", "a cancelled prompt is never a swap failure");
+});
+
 test("the referral ABI matches the deployed contract surface", () => {
   const contract = new Contract(ROOT, REFERRAL_ABI);
   for (const signature of [
     "root()", "isRegistered(address)", "registeredCount()", "getUpline(address)",
     "getDirectDownlineCount(address)", "getDirectDownlines(address,uint256,uint256)",
     "getRegisteredPage(uint256,uint256)", "getUplineChain(address,uint256)", "bindUpline(address)",
-    "getNodeLevel(address)",
+    "getNodeLevel(address)", "version()", "usdc()", "usdcReceiver()", "swapRouter()",
+    "getSwapPath()", "slippageBps()", "MAX_SLIPPAGE_BPS()", "treasury()",
   ]) {
     assert.ok(contract.interface.getFunction(signature), `${signature} is missing from the ABI`);
   }
