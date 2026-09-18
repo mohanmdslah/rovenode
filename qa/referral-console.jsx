@@ -48,7 +48,9 @@ async function main() {
   const bindNote = document.querySelector(".node-bind-note")?.textContent ?? "";
   record("the bind note no longer invites users to use the root address", !/没有推荐人/.test(bindNote),
     bindNote.trim().replace(/\s+/g, " ").slice(0, 90));
-  record("the bind note still states the two binding constraints", /必须先完成购买/.test(bindNote) && /两笔独立交易/.test(bindNote),
+  record("the bind note no longer states the self-purchase constraint", !/必须先完成购买/.test(bindNote),
+    bindNote.trim().replace(/\s+/g, " ").slice(0, 90));
+  record("the bind note keeps the two-transactions reminder", /两笔独立交易/.test(bindNote),
     bindNote.trim().replace(/\s+/g, " ").slice(0, 90));
 
   const bindRow = document.querySelector(".node-bind-row");
