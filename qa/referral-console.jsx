@@ -81,7 +81,7 @@ async function main() {
   record("an unregistered wallet is told to bind before downlines appear", /入网后/.test(downline?.textContent ?? ""), downline?.textContent?.trim().replace(/\s+/g, " ").slice(0, 70));
   record("an unregistered wallet has no rows", rowCount() === 0, `rows=${rowCount()}`);
 
-  // ── v2: the upline must already own a node ─────────────────────────────
+  // ── v2.2.0: the node requirement is gone, membership is not ────────────
   const input = document.querySelector(".node-bind-row input");
   typeInto(input, NON_NODE);
   const submit = await waitFor(() => {
@@ -90,8 +90,8 @@ async function main() {
   }, 5000);
   record("the bind button enables once an address is present", Boolean(submit));
   submit?.click();
-  const refused = await waitFor(() => (/还不是节点/.test(document.querySelector(".node-bind-status")?.textContent ?? "") ? true : null), 10000);
-  record("an upline that owns no node is refused with the v2 message", Boolean(refused), document.querySelector(".node-bind-status")?.textContent?.trim().replace(/\s+/g, " ").slice(0, 80));
+  const refused = await waitFor(() => (/尚未入网/.test(document.querySelector(".node-bind-status")?.textContent ?? "") ? true : null), 10000);
+  record("an upline that never joined the network is refused", Boolean(refused), document.querySelector(".node-bind-status")?.textContent?.trim().replace(/\s+/g, " ").slice(0, 80));
   record("no transaction is sent for a refused binding", !sent.includes("bindUpline"), `sent: ${sent.join(", ") || "none"}`);
 
   // ── binding to ROOT is allowed even though ROOT owns no node ───────────

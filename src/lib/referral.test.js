@@ -82,7 +82,7 @@ test("upline preflight rejects malformed, self and unregistered addresses", () =
   assert.equal(validateUplineAddress("0x1234", { account: WALLET }), "invalidUpline");
   assert.equal(validateUplineAddress(ZERO_ADDRESS, { account: WALLET }), "invalidUpline");
   assert.equal(validateUplineAddress(WALLET, { account: WALLET }), "cannotBindSelf");
-  assert.equal(validateUplineAddress(UPLINE, { account: WALLET, isUplineNode: () => false }), "uplineNotNode");
+  assert.equal(validateUplineAddress(UPLINE, { account: WALLET, isUplineRegistered: () => false }), "uplineNotRegistered");
   assert.equal(validateUplineAddress(UPLINE, { account: WALLET }), "");
   assert.equal(validateUplineAddress(`  ${UPLINE}  `, { account: WALLET }), "", "surrounding whitespace is ignored");
 });
@@ -91,9 +91,9 @@ test("referral errors map to stable copy keys from codes, names and messages", (
   assert.equal(describeReferralError({ code: 4001 }), "rejected");
   assert.equal(describeReferralError({ code: "MUST_BIND_UPLINE" }), "mustBindUpline");
   assert.equal(describeReferralError({ code: "ALREADY_BOUND" }), "alreadyBound");
+  assert.equal(describeReferralError({ revert: { name: "UplineNotRegistered" } }), "uplineNotRegistered");
+  // The previous proxy still throws UplineNotNode, so it stays mapped.
   assert.equal(describeReferralError({ revert: { name: "UplineNotNode" } }), "uplineNotNode");
-  // v1 revert name kept as a defensive fallback; in v2 it means the same thing.
-  assert.equal(describeReferralError({ revert: { name: "UplineNotRegistered" } }), "uplineNotNode");
   assert.equal(describeReferralError({ revert: { name: "CannotBindSelf" } }), "cannotBindSelf");
   assert.equal(describeReferralError({ message: "execution reverted: AlreadyBound()" }), "alreadyBound");
   assert.equal(describeReferralError({ message: "execution reverted: MustBindUpline()" }), "mustBindUpline");
@@ -179,16 +179,17 @@ test("the reader refuses to query without a provider or a usable account", async
   await assert.rejects(() => reader.isRegistered({ provider: PROVIDER, account: "0x1234" }), { code: "INVALID_ACCOUNT" });
 });
 
-function bindFixture({ registered = false, uplineIsNode = true, revert = null, logs = null } = {}) {
+function bindFixture({ registered = false, uplineRegistered = true, revert = null, logs = null } = {}) {
   const iface = new Interface(REFERRAL_ABI);
   const sent = [];
   const signer = { getAddress: async () => WALLET };
   const sale = {
     interface: iface,
     root: async () => ROOT,
-    isRegistered: async (address) => (sameWalletAddress(address, WALLET) ? registered : true),
-    // v2 requires the upline to own a node; ROOT is reported as owning none.
-    getNodeLevel: async (address) => (sameWalletAddress(address, ROOT) || uplineIsNode ? (sameWalletAddress(address, ROOT) ? 0 : 1) : 0),
+    isRegistered: async (address) => (sameWalletAddress(address, WALLET) ? registered : uplineRegistered),
+    // v2.2.0 no longer consults the upline's node level when binding; ROOT is
+    // reported as owning none, and so is every other upline here.
+    getNodeLevel: async () => 0,
     bindUpline: async (target) => {
       sent.push(target);
       if (revert) throw revert;
@@ -222,10 +223,10 @@ test("binding is refused before opening a wallet prompt when it cannot succeed",
   await assert.rejects(() => already.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE }), { code: "ALREADY_BOUND" });
   assert.equal(already.sent.length, 0, "no transaction is sent when the wallet is already bound");
 
-  // v2: the upline must already own a node, not merely have joined.
-  const notANode = bindFixture({ uplineIsNode: false });
-  await assert.rejects(() => notANode.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE }), { code: "UPLINE_NOT_NODE" });
-  assert.equal(notANode.sent.length, 0);
+  // v2.2.0: the upline no longer has to own a node, only to have joined.
+  const notJoined = bindFixture({ uplineRegistered: false });
+  await assert.rejects(() => notJoined.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE }), { code: "UPLINE_NOT_REGISTERED" });
+  assert.equal(notJoined.sent.length, 0);
 
   const self = bindFixture();
   await assert.rejects(() => self.bind({ provider: PROVIDER, account: WALLET, upline: WALLET }), { code: "CANNOT_BIND_SELF" });
@@ -236,10 +237,19 @@ test("binding is refused before opening a wallet prompt when it cannot succeed",
   assert.equal(malformed.sent.length, 0);
 });
 
-test("ROOT is the only upline allowed to have never bought a node", async () => {
-  const f = bindFixture({ uplineIsNode: false });
+test("an upline that joined but never bought a node is now accepted", async () => {
+  // This is the v2.2.0 behaviour change: the node requirement is gone, so a
+  // registered upline with getNodeLevel() == 0 must not be blocked.
+  const f = bindFixture({ uplineRegistered: true });
+  const result = await f.bind({ provider: PROVIDER, account: WALLET, upline: UPLINE });
+  assert.deepEqual(f.sent, [UPLINE]);
+  assert.equal(result.upline, UPLINE);
+});
+
+test("ROOT stays bindable without being registered as a node", async () => {
+  const f = bindFixture({ uplineRegistered: false });
   const result = await f.bind({ provider: PROVIDER, account: WALLET, upline: ROOT });
-  assert.deepEqual(f.sent, [ROOT]);
+  assert.deepEqual(f.sent, [ROOT], "ROOT is exempt from the membership requirement");
   assert.equal(result.upline, ROOT);
 });
 

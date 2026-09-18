@@ -90,8 +90,13 @@ export function installMockNodeSale({ bound = false, downlineCount = 23, paused 
       case "slippageBps": return sale.encodeFunctionResult(name, [V2.slippageBps]);
       case "registeredCount": return sale.encodeFunctionResult(name, [BigInt(state.bound ? state.networkSize + 1 : 1)]);
       case "isRegistered": {
+        // ROOT and everyone already in the tree are registered; a direct
+        // downline is in the network by construction.
         const account = getAddress(args[0]);
-        return sale.encodeFunctionResult(name, [account === root || (account === MOCK_ACCOUNT && state.bound)]);
+        const registered = account === root
+          || (account === MOCK_ACCOUNT && state.bound)
+          || state.downlines.some((row) => row.address === account);
+        return sale.encodeFunctionResult(name, [registered]);
       }
       case "getUpline":
         return sale.encodeFunctionResult(name, state.bound ? [state.upline, 0] : ["0x0000000000000000000000000000000000000000", 0]);

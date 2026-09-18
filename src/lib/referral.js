@@ -60,7 +60,7 @@ export function sameWalletAddress(left, right) {
 /**
  * Map a referral revert or wallet outcome to a stable copy key. The contract
  * stays the authority: the custom errors it raises (MustBindUpline,
- * UplineNotNode, AlreadyBound, CannotBindSelf) drive the message the user
+ * UplineNotRegistered, AlreadyBound, CannotBindSelf) drive the message the user
  * sees, so the UI never has to guess why a binding was refused.
  */
 export function describeReferralError(error) {
@@ -70,14 +70,17 @@ export function describeReferralError(error) {
   if (error?.code === "INVALID_UPLINE") return "invalidUpline";
   if (error?.code === "CANNOT_BIND_SELF") return "cannotBindSelf";
   if (error?.code === "UPLINE_NOT_NODE") return "uplineNotNode";
+  if (error?.code === "UPLINE_NOT_REGISTERED") return "uplineNotRegistered";
   if (error?.code === "PROVIDER_NOT_FOUND") return "walletMissing";
   if (error?.code === "WALLET_TIMEOUT") return "timeout";
   const name = String(error?.revert?.name ?? error?.errorName ?? error?.info?.error?.name ?? "");
   const text = String(error?.shortMessage ?? error?.reason ?? error?.message ?? "");
   const haystack = `${name} ${text}`;
   if (haystack.includes("MustBindUpline")) return "mustBindUpline";
-  // v2 renamed this revert: the upline must own a node, not merely have joined.
-  if (haystack.includes("UplineNotNode") || haystack.includes("UplineNotRegistered")) return "uplineNotNode";
+  // v2.2.0 dropped UplineNotNode, but the previous proxy still throws it and
+  // the current one still throws UplineNotRegistered, so both stay mapped.
+  if (haystack.includes("UplineNotRegistered")) return "uplineNotRegistered";
+  if (haystack.includes("UplineNotNode")) return "uplineNotNode";
   if (haystack.includes("AlreadyBound")) return "alreadyBound";
   if (haystack.includes("CannotBindSelf")) return "cannotBindSelf";
   if (haystack.includes("EnforcedPause")) return "paused";
@@ -101,14 +104,15 @@ export function normalizeWalletAddress(value) {
 
 /**
  * Client-side preflight for an upline address. This only avoids a pointless
- * transaction - the contract is the real gate, and in v2 it requires the upline
- * to already own a node, with ROOT as the only exception.
+ * transaction - the contract is the real gate. Since v2.2.0 there is no
+ * "upline must own a node" rule; the only membership requirement left is that
+ * the upline has joined the network, with ROOT as the exception.
  */
-export function validateUplineAddress(input, { account, isUplineNode = () => true } = {}) {
+export function validateUplineAddress(input, { account, isUplineRegistered = () => true } = {}) {
   const value = typeof input === "string" ? input.trim() : "";
   if (!isWalletAddress(value) || isZeroAddress(value)) return "invalidUpline";
   if (account && sameWalletAddress(value, account)) return "cannotBindSelf";
-  if (!isUplineNode(value)) return "uplineNotNode";
+  if (!isUplineRegistered(value)) return "uplineNotRegistered";
   return "";
 }
 
@@ -269,11 +273,13 @@ export function createBindUpline({
     if (!sameWalletAddress(active, account)) throw referralError("ACCOUNT_CHANGED", "The active wallet account changed");
 
     if (await sale.isRegistered(active)) throw referralError("ALREADY_BOUND", "This account already bound an upline");
-    // v2: the upline must already own a node; ROOT is the single exception. The
-    // contract reports its own root, so the rule is never guessed here.
+    // v2.2.0 dropped the "upline must own a node" rule, so any upline the
+    // contract accepts is allowed here. ROOT stays exempt, and the remaining
+    // on-chain requirement is that the upline has joined the network
+    // (`UplineNotRegistered`), which is still enforced.
     const rootAddress = await sale.root().catch(() => REFERRAL_ROOT_ADDRESS);
-    if (!sameWalletAddress(target, rootAddress) && Number(await sale.getNodeLevel(target)) === 0) {
-      throw referralError("UPLINE_NOT_NODE", "The upline does not own a node yet");
+    if (!sameWalletAddress(target, rootAddress) && !(await sale.isRegistered(target))) {
+      throw referralError("UPLINE_NOT_REGISTERED", "The upline has not joined the network yet");
     }
 
     const tx = await sale.bindUpline(target);
