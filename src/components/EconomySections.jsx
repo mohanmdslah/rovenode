@@ -3,8 +3,18 @@ import { useLocale } from "../i18n.jsx";
 
 const flowIcons = [Coins, ChartDonut, DropHalf, ShieldCheck];
 const vaultIcons = [Coins, DropHalf, UsersThree, Recycle];
-const allocationValues = [70, 8, 7, 5, 4, 3, 3];
-const allocationColors = ["#e8b949", "#d94d38", "#83b8cc", "#f0eee7", "#8b7a58", "#a9a39a", "#675c49"];
+// these values drive the legend, the stacked track and the orbit ring together, so the three
+// can never disagree; the ring is a conic gradient derived from the same numbers
+const allocationValues = [5, 5, 90];
+const allocationColors = ["#d94d38", "#83b8cc", "#e8b949"];
+const allocationTotal = allocationValues.reduce((sum, value) => sum + value, 0);
+const dominantAllocation = allocationValues.indexOf(Math.max(...allocationValues));
+const allocationRing = allocationValues.reduce((acc, value, index) => {
+  const start = (acc.total / allocationTotal) * 100;
+  acc.total += value;
+  acc.stops.push(`${allocationColors[index]} ${start}% ${(acc.total / allocationTotal) * 100}%`);
+  return acc;
+}, { total: 0, stops: [] }).stops.join(", ");
 
 export function EconomySections() {
   const { copy } = useLocale();
@@ -60,8 +70,8 @@ export function EconomySections() {
             </div>
           </div>
           <div className="allocation-panel" data-reveal="item">
-            <div className="allocation-orbit" aria-label="ROVE token allocation">
-              <span>70%<small>MARKET</small></span>
+            <div className="allocation-orbit" style={{ "--allocation-ring": `conic-gradient(from -90deg, ${allocationRing})` }} aria-label="ROVE token allocation">
+              <span>{allocationValues[dominantAllocation]}%<small>{copy.allocationCore}</small></span>
             </div>
             <div className="allocation-list">
               {allocationValues.map((value, index) => (
@@ -72,7 +82,7 @@ export function EconomySections() {
               ))}
             </div>
             <div className="allocation-track" aria-hidden="true">
-              {allocationValues.map((value, index) => <span key={`${value}-${index}`} style={{ width: `${value}%`, backgroundColor: allocationColors[index] }} />)}
+              {allocationValues.map((value, index) => <span key={`${value}-${index}`} style={{ width: `${(value / allocationTotal) * 100}%`, backgroundColor: allocationColors[index] }} />)}
             </div>
           </div>
         </div>
